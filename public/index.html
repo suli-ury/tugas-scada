@@ -3,188 +3,640 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SCADA Industrial Weather & Clothesline System</title>
+  <title>Jemuran Pintar & Info Cuaca</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { background-color: #0b132b; color: #ffffff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    .card-panel { background-color: #1c2541; border: 1px solid #3a506b; border-radius: 0.75rem; background: linear-gradient(135deg, #1c2541 0%, #111827 100%); }
-    .custom-shadow { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6); }
-    @keyframes data-flash {
-      0% { border-color: #f59e0b; box-shadow: 0 0 25px rgba(245, 158, 11, 0.7); transform: scale(1.02); }
-      100% { border-color: #3a506b; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6); transform: scale(1); }
+    :root {
+      --bg-void: #030e09;
+      --sidebar-bg: #071b12;
+      --card-forest: #0c291c;
+      --card-deep: #071a12;
+      --border-forest: rgba(34, 197, 94, 0.16);
     }
-    .flash-update { animation: data-flash 0.6s ease-out; }
+
+    body {
+      min-height: 100vh;
+      background-color: var(--bg-void);
+      background-image:
+        radial-gradient(circle at 18% 12%, rgba(20, 83, 45, 0.28), transparent 40%),
+        radial-gradient(circle at 85% 20%, rgba(16, 185, 129, 0.10), transparent 36%);
+      color: #f0fdf4;
+      font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .font-mono-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .forest-card {
+      background: linear-gradient(155deg, #0d2c1e 0%, #081e14 100%);
+      border: 1px solid var(--border-forest);
+      border-radius: 1.15rem;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+    }
+
+    .inset-card {
+      background-color: var(--card-deep);
+      border: 1px solid rgba(34, 197, 94, 0.11);
+      border-radius: 0.95rem;
+    }
+
+    @keyframes data-flash {
+      0% { border-color: #22c55e; box-shadow: 0 0 18px rgba(34, 197, 94, 0.35); }
+      100% { border-color: rgba(34, 197, 94, 0.16); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45); }
+    }
+    .flash-update { animation: data-flash 0.55s ease-out; }
+
+    /* ================= SIMULASI JEMURAN ================= */
+    .twin-viewport {
+      position: relative;
+      height: 215px;
+      border-radius: 0.9rem;
+      overflow: hidden;
+      border: 1px solid rgba(34, 197, 94, 0.22);
+      background: linear-gradient(180deg, #0c2b1e 0%, #14432e 68%, #071911 68%, #04100b 100%);
+      transition: background 0.9s ease;
+    }
+
+    .twin-viewport.weather-cloudy {
+      background: linear-gradient(180deg, #132821 0%, #1e3b31 68%, #071911 68%, #04100b 100%);
+    }
+
+    .twin-viewport.weather-rain {
+      background: linear-gradient(180deg, #061513 0%, #0d2622 68%, #05140e 68%, #030c08 100%);
+    }
+
+    .sun-orb {
+      position: absolute;
+      top: 16px;
+      right: 28px;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #fef08a 15%, #f59e0b 75%, #ea580c 100%);
+      box-shadow: 0 0 26px rgba(250, 204, 21, 0.65);
+      transition: all 0.8s ease;
+      z-index: 1;
+    }
+
+    .twin-viewport.weather-cloudy .sun-orb {
+      opacity: 0.35;
+      transform: scale(0.85);
+    }
+
+    .twin-viewport.weather-rain .sun-orb {
+      opacity: 0;
+      transform: translateY(24px) scale(0.5);
+    }
+
+    .storm-clouds {
+      position: absolute;
+      top: 12px;
+      right: 18px;
+      opacity: 0;
+      transform: translateX(20px);
+      transition: all 0.8s ease;
+      z-index: 2;
+    }
+
+    .twin-viewport.weather-cloudy .storm-clouds {
+      opacity: 0.65;
+      transform: translateX(0);
+    }
+
+    .twin-viewport.weather-rain .storm-clouds {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .lightning-flash {
+      position: absolute;
+      inset: 0;
+      background: rgba(134, 239, 172, 0.22);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    .twin-viewport.weather-thunder .lightning-flash {
+      animation: thunderFlash 4.5s infinite;
+    }
+
+    @keyframes thunderFlash {
+      0%, 92%, 96%, 100% { opacity: 0; }
+      93%, 95% { opacity: 1; }
+    }
+
+    .rain-container {
+      position: absolute;
+      inset: -20px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+      z-index: 5;
+      transform: rotate(10deg);
+    }
+
+    .twin-viewport.weather-rain .rain-container {
+      opacity: 1;
+    }
+
+    .rain-streak {
+      position: absolute;
+      width: 1.5px;
+      height: 18px;
+      background: linear-gradient(180deg, transparent, rgba(74, 222, 128, 0.85));
+      animation: fallStreak 0.55s linear infinite;
+    }
+
+    @keyframes fallStreak {
+      0% { transform: translateY(-30px); opacity: 0; }
+      20% { opacity: 1; }
+      100% { transform: translateY(250px); opacity: 0.2; }
+    }
+
+    .shelter-box {
+      position: absolute;
+      left: 0;
+      bottom: 30%;
+      width: 176px;
+      height: 128px;
+      background: rgba(7, 26, 18, 0.88);
+      border-right: 3px solid #22c55e;
+      border-top: 4px solid #4ade80;
+      border-top-right-radius: 12px;
+      z-index: 2;
+      padding: 9px 11px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .shelter-roof-cap {
+      position: absolute;
+      top: -14px;
+      left: -4px;
+      width: 192px;
+      height: 14px;
+      background: linear-gradient(90deg, #16a34a, #4ade80);
+      clip-path: polygon(0 100%, 4% 0, 94% 0, 100% 100%);
+      z-index: 5;
+    }
+
+    .shelter-shutter {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 6px;
+      height: 10%;
+      background: repeating-linear-gradient(
+        0deg,
+        #22c55e,
+        #22c55e 4px,
+        #14532d 4px,
+        #14532d 8px
+      );
+      transition: height 0.7s ease 0.85s;
+      z-index: 6;
+    }
+
+    .twin-viewport.clothes-inside .shelter-shutter {
+      height: 100%;
+    }
+
+    .rail-beam {
+      position: absolute;
+      left: 172px;
+      right: 24px;
+      bottom: calc(30% + 102px);
+      height: 5px;
+      background: linear-gradient(90deg, #4ade80, #16a34a);
+      border-radius: 999px;
+      z-index: 2;
+    }
+
+    .support-post {
+      position: absolute;
+      right: 24px;
+      bottom: 30%;
+      width: 8px;
+      height: 110px;
+      background: linear-gradient(90deg, #22c55e, #0f3d26);
+      border-radius: 6px 6px 0 0;
+      z-index: 1;
+    }
+
+    .motor-pulley {
+      position: absolute;
+      right: 19px;
+      bottom: calc(30% + 96px);
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #071a12;
+      border: 2.5px solid #4ade80;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .motor-pulley::after {
+      content: '';
+      width: 8px;
+      height: 2px;
+      background: #86efac;
+    }
+
+    .motor-pulley.spinning {
+      animation: spinGear 0.4s linear infinite;
+    }
+
+    @keyframes spinGear {
+      100% { transform: rotate(360deg); }
+    }
+
+    .clothes-trolley {
+      position: absolute;
+      left: 192px;
+      bottom: calc(30% + 18px);
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      z-index: 3;
+      transition: left 1.25s cubic-bezier(0.35, 0, 0.15, 1), gap 1.25s ease;
+    }
+
+    .twin-viewport.clothes-inside .clothes-trolley {
+      left: 14px;
+      gap: 6px;
+    }
+
+    .garment-unit {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transform-origin: top center;
+      animation: windSway 2.8s ease-in-out infinite alternate;
+      transition: transform 1.15s ease;
+    }
+
+    .garment-unit:nth-child(2) { animation-delay: 0.4s; }
+    .garment-unit:nth-child(3) { animation-delay: 0.8s; }
+    .garment-unit:nth-child(4) { animation-delay: 1.2s; }
+
+    .twin-viewport.clothes-inside .garment-unit {
+      animation: none;
+      transform: scale(0.82);
+    }
+
+    @keyframes windSway {
+      0% { transform: rotate(-2.2deg); }
+      100% { transform: rotate(2.2deg); }
+    }
+
+    .ground-deck {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 30%;
+      border-top: 1px solid rgba(34, 197, 94, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      z-index: 4;
+    }
   </style>
 </head>
-<body class="p-4 md:p-6 min-h-screen">
+<body class="p-3 md:p-5">
 
-  <!-- Banner Alarm Peringatan Cuaca Ekstrem -->
-  <div id="alarm-banner" class="hidden mb-4 p-3.5 rounded-xl border border-rose-500/70 bg-rose-950/80 text-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg animate-pulse">
-    <div class="flex items-center gap-3">
-      <span class="text-2xl">🚨</span>
-      <div>
-        <div id="alarm-title" class="text-xs md:text-sm font-black tracking-wider uppercase text-rose-400">ALARM PERINGATAN CUACA EKSTREM: HUJAN PETIR</div>
-        <div id="alarm-desc" class="text-xs text-rose-200">Terdeteksi kondisi Hujan Petir. Atap dikunci menutup untuk melindungi jemuran.</div>
-      </div>
-    </div>
-    <button onclick="dismissAlarm()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-lg transition shrink-0">
-      Matikan Alarm
-    </button>
-  </div>
-  
-  <!-- Header Industrial SCADA -->
-  <header class="card-panel p-4 md:p-5 mb-5 flex flex-col md:flex-row justify-between items-center custom-shadow border-cyan-500/30 gap-4">
-    <div class="flex items-center gap-4">
-      <div class="bg-gradient-to-br from-cyan-500 to-blue-600 p-3 rounded-xl text-white text-2xl shadow-lg shadow-cyan-500/30 animate-pulse flex-shrink-0">⚡</div>
-      <div>
-        <h1 class="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 tracking-wide leading-tight">
-          SCADA INDUSTRIAL WEATHER & CLOTHESLINE
-        </h1>
-        <div class="flex flex-wrap items-center gap-2 md:gap-3 mt-1">
-          <span class="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            Sistem Otomasi Atap Jemuran Pintar & Stasiun Meteorologi
-          </span>
-          <span class="text-cyan-400 font-mono text-[11px] bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/60 shadow-inner">
-            Uptime: <span id="system-uptime">00:00:00</span>
-          </span>
-        </div>
-      </div>
-    </div>
+  <div class="max-w-[1440px] mx-auto flex flex-col lg:flex-row gap-4 min-h-[calc(100vh-2.5rem)]">
 
-    <div class="flex items-center gap-3 flex-wrap justify-end">
-      <div class="text-right border-r border-slate-700/80 pr-3.5 hidden lg:block">
-        <div id="scada-date" class="text-[11px] text-slate-400 font-medium">--</div>
-        <div id="scada-time" class="text-xs font-mono font-bold text-cyan-400 tracking-wider">--:--:-- WIB</div>
+    <!-- Sidebar Kiri -->
+    <aside class="lg:w-14 bg-[#071b12] border border-emerald-500/15 rounded-2xl p-2.5 flex lg:flex-col items-center justify-between gap-2 flex-shrink-0">
+      <div class="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-400 font-extrabold text-xs">
+        JP
       </div>
-      <div id="mqtt-badge" class="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/40 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center gap-2 shadow-sm">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> MQTT: ONLINE
-      </div>
-      <div id="mode-badge" class="px-3 py-1.5 bg-cyan-500/10 text-cyan-400 border border-cyan-500/40 rounded-lg text-xs font-bold tracking-wider uppercase shadow-sm">
-        MODE: AUTO
-      </div>
-    </div>
-  </header>
 
-  <!-- Main Content Grid -->
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <nav class="flex lg:flex-col items-center gap-1.5">
+        <a href="#kolom-cuaca" title="Cuaca" class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-sm hover:bg-emerald-500/30 transition">
+          🌤️
+        </a>
+        <a href="#kolom-kontrol" title="Kontrol Jemuran" class="w-9 h-9 rounded-xl text-slate-400 hover:text-emerald-300 hover:bg-emerald-500/10 flex items-center justify-center text-sm transition">
+          👕
+        </a>
+        <a href="#section-forecast" title="Prakiraan" class="w-9 h-9 rounded-xl text-slate-400 hover:text-emerald-300 hover:bg-emerald-500/10 flex items-center justify-center text-sm transition">
+          🕒
+        </a>
+      </nav>
 
-    <!-- Panel Kiri: Kontrol & Status Atap -->
-    <div class="card-panel p-5 flex flex-col justify-between custom-shadow border-slate-700">
-      <div>
-        <h2 class="text-base font-bold text-cyan-400 mb-4 flex items-center gap-2 border-b border-slate-700/60 pb-2">⚙️ Status & Kontrol Atap</h2>
-        
-        <div class="bg-slate-900/80 p-4 rounded-xl mb-4 border border-slate-700/60 shadow-inner">
-          <div class="flex justify-between items-center mb-1">
-            <span class="text-[11px] text-slate-400 uppercase tracking-widest font-semibold">Kondisi Mekanis Atap:</span>
-            <span id="servo-speed" class="text-[10px] text-cyan-400 font-mono">180° Servo Idle</span>
+      <div class="hidden lg:flex flex-col items-center gap-1 text-[10px] font-mono-num text-emerald-400/80">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>LIVE</span>
+      </div>
+    </aside>
+
+    <!-- Konten Utama -->
+    <div class="flex-1 flex flex-col gap-4">
+
+      <!-- Top Bar Ringkas -->
+      <header class="flex flex-col md:flex-row justify-between items-center gap-3">
+        <div class="w-full md:w-auto bg-[#071b12] border border-emerald-500/15 rounded-full px-4 py-2 flex items-center justify-between md:justify-start gap-3">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span class="text-xs font-bold text-emerald-100">Jemuran Pintar</span>
           </div>
-          <div id="roof-status" class="text-lg font-black text-emerald-400 mb-3 tracking-wide">MEMBUKA (TEDUH)</div>
-          <div class="w-full bg-slate-950 h-3 rounded-full overflow-hidden p-0.5 border border-slate-800">
-            <div id="roof-bar" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-700 shadow-sm" style="width: 100%;"></div>
+          <span id="system-uptime" class="text-[11px] font-mono-num text-emerald-300">00:00:00</span>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap justify-end w-full md:w-auto">
+          <div class="hidden sm:flex items-center gap-2 bg-[#071b12] border border-emerald-500/15 rounded-full px-3 py-1.5 text-xs">
+            <span id="scada-date" class="text-slate-400">--</span>
+            <span class="text-emerald-800">|</span>
+            <span id="scada-time" class="font-mono-num font-semibold text-emerald-300">--:--:-- WIB</span>
+          </div>
+
+          <div id="mqtt-badge" class="px-3 py-1.5 bg-[#071b12] text-emerald-300 border border-emerald-500/20 rounded-full text-xs font-semibold flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Aktif
+          </div>
+
+          <div id="mode-badge" class="px-3 py-1.5 bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 rounded-full text-xs font-semibold">
+            Mode: Otomatis
           </div>
         </div>
+      </header>
 
-        <div class="bg-slate-900/80 p-4 rounded-xl mb-4 border border-slate-700/60 flex justify-between items-center shadow-inner">
-          <div>
-            <span class="text-[11px] text-slate-400 uppercase tracking-widest block mb-1 font-semibold">KONDISI CUACA REAL-TIME</span>
-            <div id="rain-status" class="text-lg font-bold text-emerald-400">Cerah Terik</div>
+      <!-- PEMBAGIAN DUA KANAN-KIRI: KIRI = CUACA & GRAFIK | KANAN = KONTROL JEMURAN -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+
+        <!-- BAGIAN KIRI: CUACA, METRIK & GRAFIK -->
+        <div id="kolom-cuaca" class="forest-card p-5 flex flex-col justify-between gap-4">
+          <div class="space-y-4">
+            <!-- Header Kartu Cuaca -->
+            <div class="flex justify-between items-center gap-2">
+              <div class="inline-flex items-center gap-2 bg-white text-[#071b12] px-3 py-1 rounded-full text-xs font-bold">
+                <span>📍</span>
+                <span>Cuaca</span>
+              </div>
+
+              <div class="text-xs font-mono-num text-slate-300 flex gap-2.5">
+                <span>Max: <strong id="stat-max" class="text-emerald-300">-</strong></span>
+                <span>Min: <strong id="stat-min" class="text-slate-400">-</strong></span>
+              </div>
+            </div>
+
+            <!-- Suhu Utama & Status Singkat -->
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <div id="rain-status" class="text-xs font-semibold text-emerald-300 mb-1">Cerah Terik</div>
+                <div id="temp-val" class="text-4xl font-mono-num font-bold text-white tracking-tight">32.0°C</div>
+                <p id="ai-analysis-text" class="text-xs text-slate-300 mt-1.5">Aman menjemur di luar.</p>
+              </div>
+              <div id="rain-icon" class="text-5xl">☀️</div>
+            </div>
+
+            <!-- 4 Metrik Ringkas dengan Ikon -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div id="card-temp" class="inset-card p-2.5 text-center transition-all">
+                <div class="text-[11px] text-slate-400">🌡️ Suhu</div>
+                <div id="temp-mini-val" class="text-sm font-mono-num font-bold text-emerald-300 mt-0.5">32.0°C</div>
+              </div>
+              <div id="card-humidity" class="inset-card p-2.5 text-center transition-all">
+                <div class="text-[11px] text-slate-400">💧 Kelembapan</div>
+                <div id="humidity-val" class="text-sm font-mono-num font-bold text-white mt-0.5">65%</div>
+              </div>
+              <div id="card-wind" class="inset-card p-2.5 text-center transition-all">
+                <div class="text-[11px] text-slate-400">💨 Angin</div>
+                <div id="wind-val" class="text-sm font-mono-num font-bold text-white mt-0.5">10.0 km/h</div>
+              </div>
+              <div id="card-uv" class="inset-card p-2.5 text-center transition-all">
+                <div class="text-[11px] text-slate-400">☀️ UV</div>
+                <div id="uv-val" class="text-sm font-bold text-emerald-300 mt-0.5">Tinggi (7)</div>
+              </div>
+            </div>
           </div>
-          <div id="rain-icon" class="text-4xl filter drop-shadow-md">☀️</div>
-        </div>
 
-        <!-- Panel AI Telemetry Analysis -->
-        <div class="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800 mb-2">
-          <div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">🤖 AI Smart Telemetry Analysis</div>
-          <div id="ai-analysis-text" class="text-xs text-emerald-400 font-medium">Sistem stabil. Kondisi lingkungan optimal untuk penjemuran pakaian.</div>
-        </div>
-      </div>
+          <!-- Satu Kotak Grafik dengan Pilihan Metrik -->
+          <div class="inset-card p-3.5 space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-xs font-bold text-white">📈 Grafik</span>
+              <div class="inline-flex rounded-full bg-[#030e09] p-0.5 border border-emerald-500/20">
+                <button
+                  type="button"
+                  id="btn-metric-temp"
+                  onclick="switchMetricChart('temp')"
+                  class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500 text-[#04100b] transition"
+                >
+                  Suhu
+                </button>
+                <button
+                  type="button"
+                  id="btn-metric-humidity"
+                  onclick="switchMetricChart('humidity')"
+                  class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-slate-300 hover:text-white transition"
+                >
+                  Kelembapan
+                </button>
+                <button
+                  type="button"
+                  id="btn-metric-wind"
+                  onclick="switchMetricChart('wind')"
+                  class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-slate-300 hover:text-white transition"
+                >
+                  Angin
+                </button>
+              </div>
+            </div>
 
-      <!-- Tombol Kontrol Interaktif -->
-      <div class="space-y-3 pt-4">
-        <div class="grid grid-cols-2 gap-3">
-          <button id="btn-auto" onclick="setMode('AUTO')" class="py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl transition text-xs shadow-lg shadow-emerald-900/40 border border-emerald-500/30">🤖 Set AUTO</button>
-          <button id="btn-manual" onclick="setMode('MANUAL')" class="py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold rounded-xl transition text-xs shadow-lg shadow-amber-900/40 border border-amber-500/30">🎮 Set MANUAL</button>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <button id="btn-buka" onclick="sendControl('BUKA')" class="py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-xl transition text-xs shadow-lg shadow-cyan-900/40 border border-cyan-500/30">📂 BUKA ATAP</button>
-          <button id="btn-tutup" onclick="sendControl('TUTUP')" class="py-2.5 bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold rounded-xl transition text-xs shadow-lg shadow-rose-900/40 border border-rose-500/30">📁 TUTUP ATAP</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Panel Kanan: Telemetri Cuaca & Grafik -->
-    <div class="lg:col-span-2 space-y-5">
-      
-      <!-- Grid Telemetri Sensor -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div id="card-temp" class="card-panel p-4 text-center custom-shadow transition-all border border-slate-700/80 rounded-xl">
-          <span class="text-[11px] text-slate-400 uppercase tracking-wider block mb-1 font-semibold">SUHU UDARA 🌡️</span>
-          <div id="temp-val" class="text-2xl font-black text-amber-400 tracking-tight">32.0 °C</div>
-        </div>
-        <div id="card-wind" class="card-panel p-4 text-center custom-shadow transition-all border border-slate-700/80 rounded-xl">
-          <span class="text-[11px] text-slate-400 uppercase tracking-wider block mb-1 font-semibold">KECEPATAN ANGIN 💨</span>
-          <div id="wind-val" class="text-2xl font-black text-cyan-400 tracking-tight">10.0 km/h</div>
-        </div>
-        <div id="card-humidity" class="card-panel p-4 text-center custom-shadow transition-all border border-slate-700/80 rounded-xl">
-          <span class="text-[11px] text-slate-400 uppercase tracking-wider block mb-1 font-semibold">KELEMBAPAN 💧</span>
-          <div id="humidity-val" class="text-2xl font-black text-blue-400 tracking-tight">65%</div>
-        </div>
-        <div id="card-uv" class="card-panel p-4 text-center custom-shadow transition-all border border-slate-700/80 rounded-xl">
-          <span class="text-[11px] text-slate-400 uppercase tracking-wider block mb-1 font-semibold">INDEKS UV ☀️</span>
-          <div id="uv-val" class="text-xl font-black text-emerald-400 tracking-tight">Tinggi (7)</div>
-        </div>
-      </div>
-
-      <!-- Grafik Real-Time Tren Suhu -->
-      <div class="card-panel p-5 custom-shadow border-slate-700">
-        <div class="flex justify-between items-center mb-3">
-          <h2 class="text-sm font-bold text-slate-200 flex items-center gap-2">📈 Tren Suhu Udara Real-Time (°C)</h2>
-          <div class="text-xs text-slate-400 flex gap-3 bg-slate-900/60 px-3 py-1 rounded-lg border border-slate-800">
-            <span>Max: <strong id="stat-max" class="text-amber-400">-</strong></span>
-            <span>Min: <strong id="stat-min" class="text-cyan-400">-</strong></span>
+            <div class="h-36 w-full">
+              <canvas id="tempChart"></canvas>
+            </div>
           </div>
         </div>
-        <div class="h-60 w-full">
-          <canvas id="tempChart"></canvas>
+
+        <!-- BAGIAN KANAN: KONTROL & SIMULASI JEMURAN -->
+        <div id="kolom-kontrol" class="forest-card p-5 flex flex-col justify-between gap-4">
+          <div class="space-y-4">
+            <!-- Header Kontrol & Mode -->
+            <div class="flex justify-between items-center gap-2">
+              <h2 class="text-sm font-bold text-white">Kontrol Jemuran</h2>
+
+              <div class="inline-flex rounded-full bg-[#061810] p-0.5 border border-emerald-500/20">
+                <button
+                  type="button"
+                  id="btn-auto"
+                  onclick="setMode('OTOMATIS')"
+                  class="px-3 py-1 rounded-full text-xs font-semibold bg-white text-[#071b12] transition"
+                >
+                  Auto
+                </button>
+                <button
+                  type="button"
+                  id="btn-manual"
+                  onclick="setMode('MANUAL')"
+                  class="px-3 py-1 rounded-full text-xs font-semibold text-slate-300 hover:text-white transition"
+                >
+                  Manual
+                </button>
+              </div>
+            </div>
+
+            <!-- Bar Posisi Jemuran -->
+            <div class="inset-card p-3.5">
+              <div class="flex justify-between items-center text-xs mb-1.5">
+                <span id="roof-status" class="font-bold text-emerald-300">Di luar</span>
+                <span id="servo-speed" class="text-slate-400 font-mono-num">Keluar penuh</span>
+              </div>
+              <div class="w-full bg-[#04100b] h-2.5 rounded-full overflow-hidden border border-emerald-500/15">
+                <div id="roof-bar" class="bg-gradient-to-r from-emerald-500 to-lime-300 h-full rounded-full transition-all duration-700" style="width: 100%;"></div>
+              </div>
+            </div>
+
+            <!-- Tombol Keluarkan / Masukkan -->
+            <div class="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                id="btn-buka"
+                onclick="sendControl('BUKA')"
+                class="py-2.5 px-3 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/35 font-semibold rounded-xl transition text-xs"
+              >
+                ☀️ Keluarkan Baju
+              </button>
+              <button
+                type="button"
+                id="btn-tutup"
+                onclick="sendControl('TUTUP')"
+                class="py-2.5 px-3 bg-[#061810] hover:bg-emerald-950/70 text-slate-200 border border-emerald-500/20 font-semibold rounded-xl transition text-xs"
+              >
+                🏠 Masukkan Baju
+              </button>
+            </div>
+          </div>
+
+          <!-- Simulasi Visual Jemuran -->
+          <div class="inset-card p-3.5 space-y-2.5">
+            <div class="flex justify-between items-center gap-2">
+              <span id="auto-sync-info" class="text-[11px] text-emerald-300 font-medium">
+                ● Sinkron cuaca
+              </span>
+              <button
+                type="button"
+                id="btn-auto-cycle"
+                onclick="toggleAutoForecastCycle()"
+                class="px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/25 hover:bg-emerald-500/25 transition"
+              >
+                Auto: ON
+              </button>
+            </div>
+
+            <div id="twinViewport" class="twin-viewport">
+              <div class="lightning-flash"></div>
+              <div id="rainContainer" class="rain-container"></div>
+              <div class="sun-orb"></div>
+
+              <svg class="storm-clouds" width="105" height="46" viewBox="0 0 130 58" fill="none">
+                <path d="M30 48H98C110.15 48 120 38.1503 120 26C120 14.588 111.31 5.207 100.19 4.108C95.59 0.99 89.86 0 83.7 0C69.95 0 58.69 10.73 57.92 24.3C55.22 22.84 52.14 22 48.86 22C38.37 22 29.86 30.51 29.86 41C29.86 41.66 29.9 42.3 29.96 42.94C23.35 44.58 18.42 50.53 18.42 57.65H30V48Z" fill="#14532d"/>
+                <path d="M18 52H76C85.3888 52 93 44.3888 93 35C93 26.18 86.28 18.93 77.68 18.08C74.12 14.12 68.96 11.6 63.2 11.6C52.58 11.6 43.88 19.88 43.29 30.36C41.21 29.23 38.83 28.6 36.3 28.6C28.2 28.6 21.63 35.17 21.63 43.27C21.63 43.77 21.66 44.27 21.7 44.76C16.6 46.03 12.8 50.62 12.8 56.12H18V52Z" fill="#166534"/>
+              </svg>
+
+              <div class="shelter-box">
+                <div class="shelter-roof-cap"></div>
+                <div id="shelterShutter" class="shelter-shutter"></div>
+                <div>
+                  <span class="text-[10px] font-bold text-emerald-300 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                    Penutup
+                  </span>
+                </div>
+                <div class="text-[10px] text-slate-300 bg-[#04100b] px-2 py-1 rounded-full border border-emerald-500/15">
+                  <span id="shelterStateText" class="text-emerald-300 font-semibold">Terbuka</span>
+                </div>
+              </div>
+
+              <div class="rail-beam"></div>
+              <div class="support-post"></div>
+              <div id="motorPulley" class="motor-pulley"></div>
+
+              <div id="clothesTrolley" class="clothes-trolley">
+                <div class="garment-unit">
+                  <svg width="30" height="58" viewBox="0 0 46 76" fill="none">
+                    <rect x="20" y="0" width="6" height="8" rx="1.5" fill="#cbd5e1"/>
+                    <path d="M13 12L3 22L8 29L13 25V66H33V25L38 29L43 22L33 12H28C26.5 15.5 19.5 15.5 18 12H13Z" fill="#22c55e" stroke="#bbf7d0" stroke-width="1.5"/>
+                  </svg>
+                </div>
+                <div class="garment-unit">
+                  <svg width="30" height="62" viewBox="0 0 46 80" fill="none">
+                    <rect x="20" y="0" width="6" height="8" rx="1.5" fill="#cbd5e1"/>
+                    <path d="M13 12L4 22L9 29L13 25V72H33V25L37 29L42 22L33 12H28L23 18L18 12H13Z" fill="#10b981" stroke="#a7f3d0" stroke-width="1.5"/>
+                  </svg>
+                </div>
+                <div class="garment-unit">
+                  <svg width="26" height="64" viewBox="0 0 40 86" fill="none">
+                    <rect x="17" y="0" width="6" height="8" rx="1.5" fill="#cbd5e1"/>
+                    <path d="M9 12H31L33 80H23L20 40L17 80H7L9 12Z" fill="#34d399" stroke="#d1fae5" stroke-width="1.5"/>
+                  </svg>
+                </div>
+                <div class="garment-unit">
+                  <svg width="26" height="56" viewBox="0 0 46 74" fill="none">
+                    <rect x="20" y="0" width="6" height="8" rx="1.5" fill="#cbd5e1"/>
+                    <path d="M13 12L3 22L8 29L13 25V64H33V25L38 29L43 22L33 12H28C26.5 15.5 19.5 15.5 18 12H13Z" fill="#84cc16" stroke="#ecfccb" stroke-width="1.5"/>
+                  </svg>
+                </div>
+              </div>
+
+              <div class="ground-deck">
+                <span class="text-[11px] text-slate-300">4 baju</span>
+                <span id="twinBadgeStatus" class="text-[11px] font-semibold text-emerald-300 bg-[#071b12] px-2.5 py-0.5 rounded-full border border-emerald-500/25">
+                  ● Di luar
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
+
       </div>
 
-    </div>
-  </div>
+      <!-- Prakiraan Per Jam di Bawah -->
+      <div id="section-forecast" class="forest-card p-4">
+        <div class="flex justify-between items-center mb-2.5">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-emerald-300">Prakiraan Per Jam</h2>
+          <span class="text-[11px] text-slate-400">Klik jam untuk uji cuaca</span>
+        </div>
+        <div id="forecast-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 text-center"></div>
+      </div>
 
-  <!-- Prakiraan Cuaca Per Jam Dinamis -->
-  <div class="card-panel p-4 md:p-5 mt-5 custom-shadow border-slate-700">
-    <div class="flex justify-between items-center mb-3">
-      <h2 class="text-md font-bold text-cyan-400 flex items-center gap-2">⏰ Prakiraan Cuaca Per Jam (Hourly Forecast)</h2>
-      <span class="text-xs text-slate-400 font-mono">Synchronized Short-Term Prediction</span>
-    </div>
-    <div id="forecast-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-center"></div>
-  </div>
-
-  <!-- Event Log SCADA -->
-  <div class="card-panel p-4 md:p-5 mt-5 custom-shadow border-slate-700">
-    <div class="flex justify-between items-center mb-3">
-      <h2 class="text-md font-bold text-cyan-400 flex items-center gap-2">📜 SCADA Event & Alarm Log</h2>
-      <button onclick="downloadLog()" class="text-xs bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700/80 px-3.5 py-1.5 rounded-lg transition font-semibold flex items-center gap-1.5 shadow-sm">
-        📥 Unduh Log CSV
-      </button>
-    </div>
-    <div id="event-log" class="bg-slate-950 font-mono text-xs p-3.5 rounded-xl h-28 overflow-y-auto space-y-1.5 text-slate-300 border border-slate-800/80 shadow-inner">
-      <div>[SYSTEM] SCADA Dashboard initialized successfully... Database logging active.</div>
     </div>
   </div>
 
   <script>
+    (function initRainStreaks() {
+      const container = document.getElementById('rainContainer');
+      if (!container) return;
+      for (let i = 0; i < 35; i++) {
+        const drop = document.createElement('div');
+        drop.className = 'rain-streak';
+        drop.style.left = `${Math.random() * 100}%`;
+        drop.style.animationDelay = `${Math.random() * 0.6}s`;
+        drop.style.animationDuration = `${0.4 + Math.random() * 0.35}s`;
+        container.appendChild(drop);
+      }
+    })();
+
     function playClickSound() {
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(620, audioCtx.currentTime);
         gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
@@ -200,36 +652,18 @@
         const gain = audioCtx.createGain();
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.45);
+        osc.stop(audioCtx.currentTime + 0.28);
       } catch(e) {}
-    }
-
-    function showThunderAlarm(weatherName) {
-      const banner = document.getElementById('alarm-banner');
-      const title = document.getElementById('alarm-title');
-      const desc = document.getElementById('alarm-desc');
-      if (banner) {
-        title.textContent = `ALARM PERINGATAN CUACA EKSTREM: ${weatherName.toUpperCase()}`;
-        desc.textContent = `Terdeteksi ${weatherName}! Risiko hujan & petir tinggi—atap ditutup otomatis.`;
-        banner.classList.remove('hidden');
-      }
-      playAlarmSound();
-    }
-
-    function dismissAlarm() {
-      playClickSound();
-      const banner = document.getElementById('alarm-banner');
-      if (banner) banner.classList.add('hidden');
     }
 
     let startTime = Date.now();
     function updateScadaClock() {
       const now = new Date();
-      const optionsDate = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+      const optionsDate = { weekday: 'short', day: 'numeric', month: 'short' };
       document.getElementById('scada-date').innerText = now.toLocaleDateString('id-ID', optionsDate);
       document.getElementById('scada-time').innerText = now.toLocaleTimeString('id-ID') + ' WIB';
 
@@ -244,289 +678,612 @@
 
     function triggerCardFlash(cardId) {
       const el = document.getElementById(cardId);
-      if(el) {
+      if (el) {
         el.classList.remove('flash-update');
         void el.offsetWidth;
         el.classList.add('flash-update');
       }
     }
 
-    function downloadLog() {
-      playClickSound();
-      const logBox = document.getElementById('event-log');
-      const text = logBox.innerText;
-      const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `SCADA_Log_${new Date().toISOString().slice(0,10)}.csv`;
-      a.click();
-      addLog("Laporan Log SCADA berhasil diunduh ke CSV.");
+    let socket = null;
+    try {
+      if (typeof io !== 'undefined') socket = io();
+    } catch (e) {
+      socket = null;
     }
 
-    const socket = io();
-    let tempHistory = [];
+    /* ================= GRAFIK MULTI-METRIK ================= */
+    let activeMetric = 'temp';
+
+    const metricStore = {
+      temp: {
+        label: 'Suhu (°C)',
+        unit: '°C',
+        ySuffix: '°',
+        lineColor: '#22c55e',
+        pointBg: '#4ade80',
+        hoverDot: '#86efac',
+        tooltipColor: '#86efac',
+        borderRgba: 'rgba(34, 197, 94, 0.35)',
+        gradTop: 'rgba(34, 197, 94, 0.30)',
+        gradMid: 'rgba(22, 163, 74, 0.08)',
+        labels: ['08:00', '08:05', '08:10', '08:15', '08:20'],
+        values: [30.5, 31.0, 32.0, 31.5, 32.0],
+        history: [30.5, 31.0, 32.0, 31.5, 32.0]
+      },
+      humidity: {
+        label: 'Kelembapan (%)',
+        unit: '%',
+        ySuffix: '%',
+        lineColor: '#34d399',
+        pointBg: '#10b981',
+        hoverDot: '#6ee7b7',
+        tooltipColor: '#6ee7b7',
+        borderRgba: 'rgba(52, 211, 153, 0.35)',
+        gradTop: 'rgba(52, 211, 153, 0.28)',
+        gradMid: 'rgba(16, 185, 129, 0.08)',
+        labels: ['08:00', '08:05', '08:10', '08:15', '08:20'],
+        values: [68, 66, 65, 67, 65],
+        history: [68, 66, 65, 67, 65]
+      },
+      wind: {
+        label: 'Angin (km/h)',
+        unit: 'km/h',
+        ySuffix: '',
+        lineColor: '#a3e635',
+        pointBg: '#84cc16',
+        hoverDot: '#bef264',
+        tooltipColor: '#bef264',
+        borderRgba: 'rgba(163, 230, 53, 0.35)',
+        gradTop: 'rgba(163, 230, 53, 0.26)',
+        gradMid: 'rgba(34, 197, 94, 0.08)',
+        labels: ['08:00', '08:05', '08:10', '08:15', '08:20'],
+        values: [9.0, 10.5, 10.0, 11.2, 10.0],
+        history: [9.0, 10.5, 10.0, 11.2, 10.0]
+      }
+    };
 
     const ctx = document.getElementById('tempChart').getContext('2d');
+
+    function buildMetricGradient(cfg) {
+      const g = ctx.createLinearGradient(0, 0, 0, 145);
+      g.addColorStop(0, cfg.gradTop);
+      g.addColorStop(0.65, cfg.gradMid);
+      g.addColorStop(1, 'rgba(7, 26, 18, 0.0)');
+      return g;
+    }
+
     const tempChart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: ['00:00', '00:05', '00:10', '00:15', '00:20'],
+        labels: [...metricStore.temp.labels],
         datasets: [{
-          label: 'Suhu Real-Time (°C)',
-          data: [30.5, 31.0, 32.0, 31.5, 32.0],
-          borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245, 158, 11, 0.15)',
-          borderWidth: 3,
+          label: metricStore.temp.label,
+          data: [...metricStore.temp.values],
+          borderColor: metricStore.temp.lineColor,
+          backgroundColor: buildMetricGradient(metricStore.temp),
+          borderWidth: 2.5,
           fill: true,
           tension: 0.4,
-          pointBackgroundColor: '#f59e0b',
-          pointRadius: 4,
-          pointHoverRadius: 6
+          pointBackgroundColor: metricStore.temp.pointBg,
+          pointBorderColor: '#071a12',
+          pointBorderWidth: 1.5,
+          pointRadius: 3.5,
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: metricStore.temp.hoverDot,
+          pointHoverBorderColor: '#ffffff',
+          pointHoverBorderWidth: 2
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
         scales: {
-          x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.04)' } },
-          y: { 
-            ticks: { color: '#94a3b8' }, 
-            grid: { color: 'rgba(255,255,255,0.04)' },
-            min: 22,
-            max: 40
+          x: {
+            ticks: {
+              color: '#86a897',
+              maxTicksLimit: 5,
+              maxRotation: 0,
+              autoSkip: true,
+              font: { family: "'JetBrains Mono', monospace", size: 10 }
+            },
+            grid: { color: 'rgba(34, 197, 94, 0.08)' }
+          },
+          y: {
+            ticks: {
+              color: '#86a897',
+              font: { family: "'JetBrains Mono', monospace", size: 10 },
+              callback: (v) => `${v}${metricStore[activeMetric].ySuffix}`
+            },
+            grid: { color: 'rgba(34, 197, 94, 0.08)' },
+            suggestedMin: 24,
+            suggestedMax: 38
           }
         },
-        plugins: { legend: { labels: { color: '#cbd5e1', font: { weight: 'bold' } } } }
+        plugins: {
+          legend: {
+            labels: {
+              color: '#dcfce7',
+              usePointStyle: true,
+              pointStyle: 'circle',
+              boxWidth: 8,
+              padding: 8,
+              font: { family: "'Plus Jakarta Sans', sans-serif", size: 11, weight: '600' }
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(7, 26, 18, 0.96)',
+            titleColor: '#86a897',
+            bodyColor: metricStore.temp.tooltipColor,
+            borderColor: metricStore.temp.borderRgba,
+            borderWidth: 1,
+            padding: 8,
+            cornerRadius: 10,
+            displayColors: false,
+            titleFont: { family: "'JetBrains Mono', monospace", size: 10 },
+            bodyFont: { family: "'JetBrains Mono', monospace", size: 12, weight: '700' },
+            callbacks: {
+              label: (item) => `${metricStore[activeMetric].label.split(' ')[0]}: ${item.parsed.y} ${metricStore[activeMetric].unit}`
+            }
+          }
+        }
       }
     });
 
-    function addLog(msg) {
-      const logBox = document.getElementById('event-log');
-      const time = new Date().toLocaleTimeString();
-      const item = document.createElement('div');
-      item.innerHTML = `<span class="text-cyan-400 font-bold">[${time}]</span> ${msg}`;
-      logBox.appendChild(item);
-      logBox.scrollTop = logBox.scrollHeight;
+    function formatStatValue(metricKey, num) {
+      if (metricKey === 'humidity') return `${Math.round(num)}%`;
+      if (metricKey === 'wind') return `${num.toFixed(1)}`;
+      return `${num.toFixed(1)}°`;
     }
 
-    function updateStats(val) {
-      const num = parseFloat(val);
-      if (!isNaN(num)) {
-        tempHistory.push(num);
-        if (tempHistory.length > 30) tempHistory.shift();
-        const max = Math.max(...tempHistory).toFixed(1);
-        const min = Math.min(...tempHistory).toFixed(1);
-        document.getElementById('stat-max').textContent = `${max}°C`;
-        document.getElementById('stat-min').textContent = `${min}°C`;
+    function refreshMetricStatsUI(metricKey) {
+      const cfg = metricStore[metricKey];
+      if (cfg.history.length > 0) {
+        const maxVal = Math.max(...cfg.history);
+        const minVal = Math.min(...cfg.history);
+        document.getElementById('stat-max').textContent = formatStatValue(metricKey, maxVal);
+        document.getElementById('stat-min').textContent = formatStatValue(metricKey, minVal);
       }
     }
 
-    function updateSmartAIAnalysis(temp, humidity, weather) {
+    function renderMetricChart(metricKey) {
+      const cfg = metricStore[metricKey];
+      const ds = tempChart.data.datasets[0];
+      tempChart.data.labels = [...cfg.labels];
+      ds.label = cfg.label;
+      ds.data = [...cfg.values];
+      ds.borderColor = cfg.lineColor;
+      ds.backgroundColor = buildMetricGradient(cfg);
+      ds.pointBackgroundColor = cfg.pointBg;
+      ds.pointHoverBackgroundColor = cfg.hoverDot;
+
+      const minVal = Math.min(...cfg.values);
+      const maxVal = Math.max(...cfg.values);
+      if (metricKey === 'humidity') {
+        tempChart.options.scales.y.min = Math.max(0, Math.floor((minVal - 8) / 5) * 5);
+        tempChart.options.scales.y.max = Math.min(100, Math.ceil((maxVal + 8) / 5) * 5);
+      } else if (metricKey === 'wind') {
+        tempChart.options.scales.y.min = 0;
+        tempChart.options.scales.y.max = Math.max(15, Math.ceil(maxVal + 4));
+      } else {
+        tempChart.options.scales.y.min = Math.floor(minVal - 2);
+        tempChart.options.scales.y.max = Math.ceil(maxVal + 2);
+      }
+
+      tempChart.options.scales.y.ticks.callback = (v) => `${v}${cfg.ySuffix}`;
+      tempChart.options.plugins.tooltip.bodyColor = cfg.tooltipColor;
+      tempChart.options.plugins.tooltip.borderColor = cfg.borderRgba;
+      tempChart.options.plugins.tooltip.callbacks = {
+        label: (item) => `${cfg.label.split(' ')[0]}: ${item.parsed.y} ${cfg.unit}`
+      };
+
+      refreshMetricStatsUI(metricKey);
+      tempChart.update();
+    }
+
+    function switchMetricChart(nextKey) {
+      playClickSound();
+      activeMetric = nextKey;
+
+      const btnT = document.getElementById('btn-metric-temp');
+      const btnH = document.getElementById('btn-metric-humidity');
+      const btnW = document.getElementById('btn-metric-wind');
+
+      btnT.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-slate-300 hover:text-white transition';
+      btnH.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-slate-300 hover:text-white transition';
+      btnW.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-slate-300 hover:text-white transition';
+
+      if (nextKey === 'temp') {
+        btnT.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500 text-[#04100b] transition';
+      } else if (nextKey === 'humidity') {
+        btnH.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-400 text-[#04100b] transition';
+      } else {
+        btnW.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-lime-400 text-[#04100b] transition';
+      }
+
+      renderMetricChart(nextKey);
+    }
+
+    function formatShortTimeLabel(baseLabel = null) {
+      if (baseLabel && /^\d{2}:\d{2}$/.test(baseLabel)) {
+        return baseLabel;
+      }
+      return new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function recordMetricPoint(metricKey, rawVal, labelText = null) {
+      const num = parseFloat(rawVal);
+      if (isNaN(num)) return;
+      const cfg = metricStore[metricKey];
+      const label = formatShortTimeLabel(labelText);
+
+      if (cfg.labels.length > 8) {
+        cfg.labels.shift();
+        cfg.values.shift();
+      }
+      cfg.labels.push(label);
+      cfg.values.push(num);
+
+      cfg.history.push(num);
+      if (cfg.history.length > 30) cfg.history.shift();
+
+      if (activeMetric === metricKey) {
+        renderMetricChart(metricKey);
+      }
+    }
+
+    function setUvDisplay(uvScore) {
+      const uvEl = document.getElementById('uv-val');
+      let uvText = `Rendah (${uvScore})`;
+      let uvColor = 'text-emerald-300';
+      if (uvScore >= 8) { uvText = `Sangat (${uvScore})`; uvColor = 'text-amber-300 font-bold animate-pulse'; }
+      else if (uvScore >= 6) { uvText = `Tinggi (${uvScore})`; uvColor = 'text-emerald-300 font-bold'; }
+      else if (uvScore >= 3) { uvText = `Sedang (${uvScore})`; uvColor = 'text-white'; }
+      uvEl.textContent = uvText;
+      uvEl.className = `text-sm font-bold ${uvColor} mt-0.5`;
+      triggerCardFlash('card-uv');
+    }
+
+    function updateEnvironmentCards(slot) {
+      document.getElementById('temp-val').textContent = `${slot.temp}°C`;
+      document.getElementById('temp-mini-val').textContent = `${slot.temp}°C`;
+      document.getElementById('wind-val').textContent = `${slot.wind} km/h`;
+      document.getElementById('humidity-val').textContent = `${slot.humidity}%`;
+      setUvDisplay(slot.uv);
+
+      triggerCardFlash('card-temp');
+      triggerCardFlash('card-wind');
+      triggerCardFlash('card-humidity');
+
+      recordMetricPoint('temp', slot.temp, slot.hoursStr);
+      recordMetricPoint('humidity', slot.humidity, slot.hoursStr);
+      recordMetricPoint('wind', slot.wind, slot.hoursStr);
+    }
+
+    function updateSmartAIAnalysis(temp, weather) {
       const aiText = document.getElementById('ai-analysis-text');
       if (weather.includes('Hujan')) {
-        aiText.className = 'text-xs text-rose-400 font-bold animate-pulse';
-        aiText.textContent = `Peringatan: Risiko basah tinggi (${weather}). Atap dikunci tertutup demi keamanan pakaian.`;
+        aiText.className = 'text-xs text-amber-300 font-semibold mt-1.5';
+        aiText.textContent = `${weather}: jemuran masuk penutup.`;
       } else if (temp > 34) {
-        aiText.className = 'text-xs text-amber-400 font-bold';
-        aiText.textContent = `Suhu tinggi (${temp}°C). Proses pengeringan pakaian berlangsung cepat.`;
+        aiText.className = 'text-xs text-emerald-300 font-semibold mt-1.5';
+        aiText.textContent = `${temp}°C: cepat kering di luar.`;
       } else {
-        aiText.className = 'text-xs text-emerald-400 font-medium';
-        aiText.textContent = `Sistem stabil (${weather}). Kondisi lingkungan optimal untuk penjemuran pakaian.`;
+        aiText.className = 'text-xs text-slate-300 mt-1.5';
+        aiText.textContent = `Aman menjemur di luar.`;
       }
     }
 
-    let cachedForecast = null;
-    let lastGeneratedHour = -1;
-
-    function updateHourlyForecast(currentTemp) {
-      const container = document.getElementById('forecast-container');
-      const now = new Date();
-      const currentHour = now.getHours();
-      
-      if (cachedForecast && lastGeneratedHour === currentHour) {
-        return; 
-      }
-
-      container.innerHTML = '';
-      cachedForecast = [];
-      lastGeneratedHour = currentHour;
-
-      const baseTemp = parseFloat(currentTemp) || 32.0;
-
-      const dayPool = [
-        { name: 'Cerah Terik', icon: '☀️', offset: 2.0, color: 'text-amber-400' },
-        { name: 'Panas Berawan', icon: '🌤️', offset: 1.0, color: 'text-amber-300' },
-        { name: 'Berawan', icon: '☁️', offset: 0.0, color: 'text-slate-300' },
-        { name: 'Hujan Gerimis', icon: '🌦️', offset: -1.5, color: 'text-blue-400' }
-      ];
-
-      const nightPool = [
-        { name: 'Cerah Berawan', icon: '🌙', offset: -1.0, color: 'text-cyan-300' },
-        { name: 'Berawan', icon: '☁️', offset: -2.0, color: 'text-slate-300' },
-        { name: 'Hujan Gerimis', icon: '🌧️', offset: -3.0, color: 'text-blue-400' },
-        { name: 'Hujan Petir', icon: '⛈️', offset: -4.0, color: 'text-rose-400' }
-      ];
-
-      for (let i = 1; i <= 6; i++) {
-        const targetHour = (currentHour + i) % 24;
-        const hoursStr = String(targetHour).padStart(2, '0') + ':00';
-        const isDaytime = targetHour >= 6 && targetHour < 18;
-        
-        const pool = isDaytime ? dayPool : nightPool;
-        const index = (targetHour + Math.floor(targetHour / 2)) % pool.length;
-        const cond = pool[index];
-
-        const estimatedTemp = (baseTemp + cond.offset + (Math.sin(targetHour) * 0.4)).toFixed(1);
-
-        const card = document.createElement('div');
-        card.className = 'bg-slate-900/80 p-3 rounded-xl border border-slate-700/60 hover:border-amber-500/50 transition-all shadow-md';
-        card.innerHTML = `
-          <div class="text-[11px] text-slate-400 mb-0.5 font-mono">${hoursStr}</div>
-          <div class="text-xl my-0.5">${cond.icon}</div>
-          <div class="text-xs font-bold text-slate-200">${cond.name}</div>
-          <div class="text-xs ${cond.color} mt-0.5 font-semibold">${estimatedTemp}°C</div>
-        `;
-        container.appendChild(card);
-      }
-    }
-
-    let currentMode = '';
-    let currentRoof = '';
-    let currentWeather = '';
-
-    socket.on('initial_state', (data) => {
-      document.getElementById('temp-val').textContent = `${data.temp} °C`;
-      document.getElementById('wind-val').textContent = `${data.wind} km/h`;
-      document.getElementById('humidity-val').textContent = `${data.humidity}%`;
-      updateHourlyForecast(data.temp);
-      updateStats(data.temp);
-    });
-
-    socket.on('mqtt_status', (isOnline) => {
-      const badge = document.getElementById('mqtt-badge');
-      if (isOnline) {
-        badge.className = "px-3 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/40 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center gap-2";
-        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> MQTT: ONLINE`;
-      } else {
-        badge.className = "px-3 py-1.5 bg-rose-500/10 text-rose-400 border border-rose-500/40 rounded-lg text-xs font-bold tracking-wider uppercase flex items-center gap-2";
-        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span> MQTT: OFFLINE`;
-      }
-    });
-
-    socket.on('telemetri_suhu', (val) => {
-      document.getElementById('temp-val').textContent = `${val} °C`;
-      triggerCardFlash('card-temp');
-      const time = new Date().toLocaleTimeString();
-      if (tempChart.data.labels.length > 10) {
-        tempChart.data.labels.shift();
-        tempChart.data.datasets[0].data.shift();
-      }
-      tempChart.data.labels.push(time);
-      tempChart.data.datasets[0].data.push(val);
-      tempChart.update();
-
-      updateHourlyForecast(val);
-      updateStats(val);
-    });
-
-    socket.on('telemetri_angin', (val) => { 
-      document.getElementById('wind-val').textContent = `${val} km/h`; 
-      triggerCardFlash('card-wind');
-    });
-
-    socket.on('telemetri_kelembapan', (val) => { 
-      document.getElementById('humidity-val').textContent = `${val}%`; 
-      triggerCardFlash('card-humidity');
-    });
-
-    socket.on('telemetri_uv', (val) => {
-      let uvText = `Normal (${val})`;
-      let uvColor = 'text-emerald-400';
-      if (val >= 8) { uvText = `Sangat Tinggi (${val})`; uvColor = 'text-rose-500 font-black animate-pulse'; }
-      else if (val >= 6) { uvText = `Tinggi (${val})`; uvColor = 'text-amber-400 font-bold'; }
-      else if (val >= 3) { uvText = `Sedang (${val})`; uvColor = 'text-yellow-300'; }
-      
-      const uvEl = document.getElementById('uv-val');
-      uvEl.textContent = uvText;
-      uvEl.className = `text-xl font-black ${uvColor} tracking-tight`;
-      triggerCardFlash('card-uv');
-    });
-
-    socket.on('status_mode', (val) => {
-      document.getElementById('mode-badge').textContent = `MODE: ${val}`;
-      if (currentMode !== val) {
-        addLog(`Mode sistem diubah menjadi: ${val}`);
-        currentMode = val;
-      }
-    });
-
-    socket.on('status_atap', (val) => {
-      document.getElementById('roof-status').textContent = val;
+    function setClothesPosition(isInside) {
+      const viewport = document.getElementById('twinViewport');
+      const pulley = document.getElementById('motorPulley');
+      const shelterState = document.getElementById('shelterStateText');
+      const twinBadge = document.getElementById('twinBadgeStatus');
+      const roofStatus = document.getElementById('roof-status');
       const roofBar = document.getElementById('roof-bar');
       const servoSpeed = document.getElementById('servo-speed');
 
-      if (val.includes('MEMBUKA')) {
-        roofBar.style.width = '100%';
-        roofBar.className = 'bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-700 shadow-sm';
-        servoSpeed.textContent = '180° Open Pos';
-      } else {
+      pulley.classList.add('spinning');
+      setTimeout(() => pulley.classList.remove('spinning'), 1250);
+
+      if (isInside) {
+        viewport.classList.add('clothes-inside');
+        shelterState.textContent = 'Tertutup';
+        shelterState.className = 'text-amber-300 font-semibold';
+
+        twinBadge.textContent = '● Di dalam';
+        twinBadge.className = 'text-[11px] font-semibold text-amber-300 bg-[#071b12] px-2.5 py-0.5 rounded-full border border-amber-400/30';
+
+        roofStatus.textContent = 'Di dalam';
+        roofStatus.className = 'font-bold text-amber-300';
         roofBar.style.width = '15%';
-        roofBar.className = 'bg-gradient-to-r from-rose-600 to-red-500 h-full rounded-full transition-all duration-700 shadow-sm';
-        servoSpeed.textContent = '0° Closed Pos';
-      }
+        roofBar.className = 'bg-amber-400 h-full rounded-full transition-all duration-700';
+        servoSpeed.textContent = 'Masuk';
+      } else {
+        viewport.classList.remove('clothes-inside');
+        shelterState.textContent = 'Terbuka';
+        shelterState.className = 'text-emerald-300 font-semibold';
 
-      if (currentRoof !== val) {
-        addLog(`Status Atap Berubah: ${val}`);
-        currentRoof = val;
-      }
-    });
+        twinBadge.textContent = '● Di luar';
+        twinBadge.className = 'text-[11px] font-semibold text-emerald-300 bg-[#071b12] px-2.5 py-0.5 rounded-full border border-emerald-500/25';
 
-    socket.on('status_hujan', (val) => {
+        roofStatus.textContent = 'Di luar';
+        roofStatus.className = 'font-bold text-emerald-300';
+        roofBar.style.width = '100%';
+        roofBar.className = 'bg-gradient-to-r from-emerald-500 to-lime-300 h-full rounded-full transition-all duration-700';
+        servoSpeed.textContent = 'Keluar penuh';
+      }
+    }
+
+    let currentMode = 'OTOMATIS';
+    let currentWeather = 'Cerah Terik';
+    let autoForecastCycleEnabled = true;
+    let forecastItems = [];
+    let activeForecastIdx = 0;
+
+    function syncModeButtons(mode) {
+      const btnAuto = document.getElementById('btn-auto');
+      const btnManual = document.getElementById('btn-manual');
+      if (mode === 'OTOMATIS') {
+        btnAuto.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-white text-[#071b12] transition';
+        btnManual.className = 'px-3 py-1 rounded-full text-xs font-semibold text-slate-300 hover:text-white transition';
+      } else {
+        btnManual.className = 'px-3 py-1 rounded-full text-xs font-semibold bg-white text-[#071b12] transition';
+        btnAuto.className = 'px-3 py-1 rounded-full text-xs font-semibold text-slate-300 hover:text-white transition';
+      }
+    }
+
+    function applyWeatherState(val) {
       const statusEl = document.getElementById('rain-status');
       const iconEl = document.getElementById('rain-icon');
+      const viewport = document.getElementById('twinViewport');
+
       statusEl.textContent = val;
+      currentWeather = val;
 
-      const currentTempNum = parseFloat(document.getElementById('temp-val').textContent) || 32;
-      const currentHumNum = parseInt(document.getElementById('humidity-val').textContent) || 65;
-      updateSmartAIAnalysis(currentTempNum, currentHumNum, val);
+      viewport.classList.remove('weather-cloudy', 'weather-rain', 'weather-thunder');
 
-      if (val === 'Hujan Petir') {
-        statusEl.className = 'text-lg font-bold text-rose-500 animate-pulse';
-        iconEl.textContent = '⛈️';
-        showThunderAlarm(val);
-        if (currentWeather !== val) addLog(`ALARM: Cuaca berubah menjadi ${val}!`);
-      } else if (val === 'Hujan Gerimis') {
-        statusEl.className = 'text-lg font-bold text-blue-400';
-        iconEl.textContent = '🌦️';
-        if (currentWeather !== val) addLog(`Info Cuaca: ${val} terdeteksi.`);
-      } else if (val === 'Berawan') {
-        statusEl.className = 'text-lg font-bold text-slate-300';
-        iconEl.textContent = '☁️';
-        if (currentWeather !== val) addLog(`Info Cuaca: ${val}.`);
-      } else if (val === 'Panas Berawan') {
-        statusEl.className = 'text-lg font-bold text-amber-300';
-        iconEl.textContent = '🌤️';
-        if (currentWeather !== val) addLog(`Info Cuaca: ${val}.`);
+      const isRain = val.toLowerCase().includes('hujan');
+      if (isRain) {
+        viewport.classList.add('weather-rain');
+        if (val.includes('Petir')) {
+          viewport.classList.add('weather-thunder');
+          statusEl.className = 'text-xs text-amber-300 font-semibold mb-1 animate-pulse';
+          iconEl.textContent = '⛈️';
+          playAlarmSound();
+        } else {
+          statusEl.className = 'text-xs text-emerald-300 font-semibold mb-1';
+          iconEl.textContent = '🌦️';
+        }
+        if (currentMode === 'OTOMATIS') {
+          setClothesPosition(true);
+        }
       } else {
-        statusEl.className = 'text-lg font-bold text-emerald-400';
-        iconEl.textContent = '☀️';
-        if (currentWeather !== val) addLog(`Info Cuaca: ${val}.`);
+        if (val === 'Berawan') {
+          viewport.classList.add('weather-cloudy');
+          statusEl.className = 'text-xs text-slate-300 mb-1';
+          iconEl.textContent = '☁️';
+        } else if (val === 'Panas Berawan') {
+          statusEl.className = 'text-xs text-lime-300 mb-1';
+          iconEl.textContent = '🌤️';
+        } else {
+          statusEl.className = 'text-xs text-emerald-300/90 mb-1';
+          iconEl.textContent = '☀️';
+        }
+        if (currentMode === 'OTOMATIS') {
+          setClothesPosition(false);
+        }
       }
 
-      currentWeather = val;
-    });
+      const currentTempNum = parseFloat(document.getElementById('temp-val').textContent) || 32;
+      updateSmartAIAnalysis(currentTempNum, val);
+    }
+
+    function buildHourlyForecast(currentTemp) {
+      const container = document.getElementById('forecast-container');
+      const now = new Date();
+      const currentHour = now.getHours();
+      const baseTemp = parseFloat(currentTemp) || 32.0;
+
+      const dayPool = [
+        { name: 'Cerah Terik', icon: '☀️', offset: 2.0, wind: 9.5, humidity: 58, uv: 8 },
+        { name: 'Panas Berawan', icon: '🌤️', offset: 1.0, wind: 12.0, humidity: 64, uv: 7 },
+        { name: 'Berawan', icon: '☁️', offset: 0.0, wind: 15.5, humidity: 74, uv: 4 },
+        { name: 'Hujan Gerimis', icon: '🌦️', offset: -1.5, wind: 19.0, humidity: 86, uv: 2 },
+        { name: 'Hujan Petir', icon: '⛈️', offset: -3.0, wind: 25.0, humidity: 93, uv: 1 }
+      ];
+      const nightPool = [
+        { name: 'Cerah Berawan', icon: '🌙', offset: -1.0, wind: 7.5, humidity: 72, uv: 0 },
+        { name: 'Berawan', icon: '☁️', offset: -2.0, wind: 11.0, humidity: 79, uv: 0 },
+        { name: 'Hujan Gerimis', icon: '🌧️', offset: -3.0, wind: 17.5, humidity: 89, uv: 0 },
+        { name: 'Hujan Petir', icon: '⛈️', offset: -4.0, wind: 26.0, humidity: 94, uv: 0 }
+      ];
+
+      forecastItems = [];
+      container.innerHTML = '';
+
+      for (let i = 0; i < 6; i++) {
+        const targetHour = (currentHour + i) % 24;
+        const hoursStr = String(targetHour).padStart(2, '0') + ':00';
+        const isDaytime = targetHour >= 6 && targetHour < 18;
+        const pool = isDaytime ? dayPool : nightPool;
+        const cond = pool[(targetHour + i) % pool.length];
+        const estimatedTemp = (baseTemp + cond.offset + (Math.sin(targetHour) * 0.4)).toFixed(1);
+        const windVal = (cond.wind + ((i % 3) * 1.4)).toFixed(1);
+        const humidityVal = Math.min(98, Math.max(45, cond.humidity + (i % 2 === 0 ? 2 : -2)));
+
+        forecastItems.push({
+          hoursStr,
+          name: cond.name,
+          icon: cond.icon,
+          temp: estimatedTemp,
+          wind: windVal,
+          humidity: humidityVal,
+          uv: cond.uv
+        });
+
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.id = `forecast-card-${i}`;
+        card.onclick = () => selectForecastSlot(i);
+        card.className = 'inset-card p-2.5 hover:border-emerald-400/40 transition-all text-center';
+        card.innerHTML = `
+          <div class="text-[11px] text-slate-400 font-mono-num">${hoursStr}</div>
+          <div class="text-lg my-0.5">${cond.icon}</div>
+          <div class="text-xs font-semibold text-white truncate">${cond.name}</div>
+          <div class="text-xs font-mono-num text-emerald-300 mt-0.5 font-bold">${estimatedTemp}°</div>
+        `;
+        container.appendChild(card);
+      }
+
+      highlightForecastSlot(activeForecastIdx);
+    }
+
+    function highlightForecastSlot(idx) {
+      for (let i = 0; i < forecastItems.length; i++) {
+        const el = document.getElementById(`forecast-card-${i}`);
+        if (!el) continue;
+        if (i === idx) {
+          el.classList.add('border-emerald-400', 'ring-1', 'ring-emerald-400/40', 'bg-[#0f3625]');
+        } else {
+          el.classList.remove('border-emerald-400', 'ring-1', 'ring-emerald-400/40', 'bg-[#0f3625]');
+        }
+      }
+    }
+
+    function selectForecastSlot(idx) {
+      if (!forecastItems[idx]) return;
+      activeForecastIdx = idx;
+      highlightForecastSlot(idx);
+
+      const slot = forecastItems[idx];
+      updateEnvironmentCards(slot);
+      applyWeatherState(slot.name);
+    }
+
+    function toggleAutoForecastCycle() {
+      playClickSound();
+      autoForecastCycleEnabled = !autoForecastCycleEnabled;
+      const btn = document.getElementById('btn-auto-cycle');
+      const info = document.getElementById('auto-sync-info');
+
+      if (autoForecastCycleEnabled) {
+        btn.textContent = 'Auto: ON';
+        btn.className = 'px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/25 hover:bg-emerald-500/25 transition';
+        info.textContent = '● Sinkron cuaca';
+        info.className = 'text-[11px] text-emerald-300 font-medium';
+        selectForecastSlot(activeForecastIdx);
+      } else {
+        btn.textContent = 'Auto: OFF';
+        btn.className = 'px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-[#061810] text-slate-400 border border-emerald-500/15 hover:text-slate-200 transition';
+        info.textContent = '○ Siklus dijeda';
+        info.className = 'text-[11px] text-slate-400';
+      }
+    }
+
+    refreshMetricStatsUI(activeMetric);
+    buildHourlyForecast(32.0);
+    selectForecastSlot(0);
+
+    setInterval(() => {
+      if (autoForecastCycleEnabled && currentMode === 'OTOMATIS' && forecastItems.length > 0) {
+        const nextIdx = (activeForecastIdx + 1) % forecastItems.length;
+        selectForecastSlot(nextIdx);
+      } else {
+        const baseTemp = parseFloat(document.getElementById('temp-val').textContent) || 32.0;
+        const jitter = (Math.random() * 0.6 - 0.3).toFixed(1);
+        const liveTemp = (baseTemp + parseFloat(jitter)).toFixed(1);
+        document.getElementById('temp-val').textContent = `${liveTemp}°C`;
+        document.getElementById('temp-mini-val').textContent = `${liveTemp}°C`;
+        triggerCardFlash('card-temp');
+        recordMetricPoint('temp', liveTemp);
+      }
+    }, 6000);
+
+    if (socket) {
+      socket.on('initial_state', (data) => {
+        document.getElementById('temp-val').textContent = `${data.temp}°C`;
+        document.getElementById('temp-mini-val').textContent = `${data.temp}°C`;
+        document.getElementById('wind-val').textContent = `${data.wind} km/h`;
+        document.getElementById('humidity-val').textContent = `${data.humidity}%`;
+        if (typeof data.uv !== 'undefined') setUvDisplay(Number(data.uv));
+        buildHourlyForecast(data.temp);
+        recordMetricPoint('temp', data.temp);
+        recordMetricPoint('humidity', data.humidity);
+        recordMetricPoint('wind', data.wind);
+      });
+
+      socket.on('mqtt_status', (isOnline) => {
+        const badge = document.getElementById('mqtt-badge');
+        if (isOnline) {
+          badge.className = "px-3 py-1.5 bg-[#071b12] text-emerald-300 border border-emerald-500/20 rounded-full text-xs font-semibold flex items-center gap-1.5";
+          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Aktif`;
+        } else {
+          badge.className = "px-3 py-1.5 bg-[#071b12] text-amber-300 border border-amber-400/25 rounded-full text-xs font-semibold flex items-center gap-1.5";
+          badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> Terputus`;
+        }
+      });
+
+      socket.on('telemetri_suhu', (val) => {
+        document.getElementById('temp-val').textContent = `${val}°C`;
+        document.getElementById('temp-mini-val').textContent = `${val}°C`;
+        triggerCardFlash('card-temp');
+        recordMetricPoint('temp', val);
+      });
+
+      socket.on('telemetri_angin', (val) => {
+        document.getElementById('wind-val').textContent = `${val} km/h`;
+        triggerCardFlash('card-wind');
+        recordMetricPoint('wind', val);
+      });
+
+      socket.on('telemetri_kelembapan', (val) => {
+        document.getElementById('humidity-val').textContent = `${val}%`;
+        triggerCardFlash('card-humidity');
+        recordMetricPoint('humidity', val);
+      });
+
+      socket.on('telemetri_uv', (val) => {
+        setUvDisplay(Number(val));
+      });
+
+      socket.on('status_mode', (val) => {
+        currentMode = val;
+        syncModeButtons(val);
+        document.getElementById('mode-badge').textContent = `Mode: ${val}`;
+      });
+
+      socket.on('status_hujan', (val) => {
+        applyWeatherState(val);
+      });
+    }
 
     function setMode(mode) {
       playClickSound();
-      socket.emit('set_mode', mode);
-      addLog(`Permintaan ubah mode dikirim: ${mode}`);
+      currentMode = mode;
+      syncModeButtons(mode);
+      document.getElementById('mode-badge').textContent = `Mode: ${mode}`;
+      if (mode === 'OTOMATIS') {
+        applyWeatherState(currentWeather);
+      }
+      if (socket) socket.emit('set_mode', mode);
     }
 
     function sendControl(cmd) {
       playClickSound();
-      socket.emit('command_control', cmd);
-      addLog(`Perintah Manual dikirim: ${cmd} ATAP`);
+      currentMode = 'MANUAL';
+      syncModeButtons('MANUAL');
+      document.getElementById('mode-badge').textContent = 'Mode: Manual';
+      if (cmd === 'TUTUP') {
+        setClothesPosition(true);
+      } else {
+        setClothesPosition(false);
+      }
+      if (socket) socket.emit('command_control', cmd);
     }
   </script>
 </body>
